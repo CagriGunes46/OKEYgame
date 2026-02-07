@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Online Okey Oyunu - 4 kişilik multiplayer okey oyunu">
+    <title>Okey Online - Multiplayer Okey Oyunu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Lobi Ekranı -->
+    <div id="lobby-screen" class="screen active">
+        <div class="lobby-container">
+            <div class="logo-section">
+                <div class="logo">
+                    <span class="logo-icon">🎴</span>
+                    <h1>Okey Online</h1>
+                </div>
+                <p class="tagline">4 Kişilik Multiplayer Okey Oyunu</p>
+            </div>
+
+            <div class="player-form">
+                <div class="input-group">
+                    <label for="player-name">Oyuncu Adı</label>
+                    <input type="text" id="player-name" placeholder="Adınızı girin..." maxlength="20">
+                </div>
+
+                <div class="button-group">
+                    <button id="create-room-btn" class="btn btn-primary">
+                        <span class="btn-icon">➕</span>
+                        Oda Oluştur
+                    </button>
+                    <button id="join-room-btn" class="btn btn-secondary">
+                        <span class="btn-icon">🚪</span>
+                        Odaya Katıl
+                    </button>
+                </div>
+            </div>
+
+            <div id="join-form" class="join-form hidden">
+                <div class="input-group">
+                    <label for="room-code">Oda Kodu</label>
+                    <input type="text" id="room-code" placeholder="6 haneli kod..." maxlength="6">
+                </div>
+                <button id="confirm-join-btn" class="btn btn-accent">Katıl</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bekleme Odası -->
+    <div id="waiting-room" class="screen">
+        <div class="waiting-container">
+            <div class="room-header">
+                <h2>Oyun Odası</h2>
+                <div class="room-code-display">
+                    <span>Oda Kodu:</span>
+                    <span id="display-room-code" class="code"></span>
+                    <button id="copy-code-btn" class="btn-icon-only" title="Kodu Kopyala">📋</button>
+                </div>
+            </div>
+
+            <div class="players-grid" id="players-grid">
+                <!-- Oyuncular buraya eklenecek -->
+            </div>
+
+            <div class="waiting-actions">
+                <button id="start-game-btn" class="btn btn-primary btn-large" disabled>
+                    <span class="btn-icon">🎮</span>
+                    Oyunu Başlat
+                    <span class="player-count">(0/4)</span>
+                </button>
+                <button id="leave-room-btn" class="btn btn-danger">
+                    <span class="btn-icon">🚪</span>
+                    Odadan Ayrıl
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Oyun Ekranı -->
+    <div id="game-screen" class="screen">
+        <div class="game-container">
+            <!-- Üst Oyuncu -->
+            <div class="opponent opponent-top" id="opponent-top">
+                <div class="player-info">
+                    <span class="player-name">Oyuncu</span>
+                    <span class="tile-count">14 taş</span>
+                </div>
+                <div class="opponent-tiles"></div>
+            </div>
+
+            <!-- Sol Oyuncu -->
+            <div class="opponent opponent-left" id="opponent-left">
+                <div class="player-info">
+                    <span class="player-name">Oyuncu</span>
+                    <span class="tile-count">14 taş</span>
+                </div>
+                <div class="opponent-tiles"></div>
+            </div>
+
+            <!-- Sağ Oyuncu -->
+            <div class="opponent opponent-right" id="opponent-right">
+                <div class="player-info">
+                    <span class="player-name">Oyuncu</span>
+                    <span class="tile-count">14 taş</span>
+                </div>
+                <div class="opponent-tiles"></div>
+            </div>
+
+            <!-- Oyun Masası (Ortası) -->
+            <div class="game-table">
+                <div class="table-center">
+                    <!-- Gösterge -->
+                    <div class="indicator-section">
+                        <span class="label">Gösterge</span>
+                        <div id="indicator-tile" class="tile"></div>
+                        <span class="label">Okey: <span id="okey-info"></span></span>
+                    </div>
+
+                    <!-- Orta Deste -->
+                    <div class="draw-section">
+                        <div id="center-pile" class="pile center-pile" title="Taş Çek">
+                            <span class="pile-count">0</span>
+                        </div>
+                        <span class="label">Deste</span>
+                    </div>
+
+                    <!-- Atılan Taşlar -->
+                    <div class="discard-section">
+                        <div id="discard-pile" class="pile discard-pile" title="Atılan Taşı Al">
+                            <div id="last-discarded" class="tile"></div>
+                        </div>
+                        <span class="label">Atılan</span>
+                    </div>
+                </div>
+
+                <!-- Sıra Göstergesi -->
+                <div id="turn-indicator" class="turn-indicator">
+                    <span>Sıra: </span>
+                    <span id="current-player-name">-</span>
+                </div>
+            </div>
+
+            <!-- Oyuncunun Eli -->
+            <div class="player-hand-section">
+                <div id="player-hand" class="player-hand">
+                    <!-- Taşlar buraya eklenecek -->
+                </div>
+                <div class="hand-actions">
+                    <button id="finish-btn" class="btn btn-success" disabled>
+                        <span class="btn-icon">✓</span>
+                        Oyunu Bitir
+                    </button>
+                    <button id="sort-btn" class="btn btn-secondary">
+                        <span class="btn-icon">↕</span>
+                        Sırala
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sonuç Modalı -->
+    <div id="result-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="result-title">🎉 Kazanan!</h2>
+            </div>
+            <div class="modal-body">
+                <div class="winner-info">
+                    <span class="winner-name" id="winner-name"></span>
+                    <span class="winner-score" id="winner-score"></span>
+                </div>
+                <div class="score-details" id="score-details"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="play-again-btn" class="btn btn-primary">Tekrar Oyna</button>
+                <button id="back-to-lobby-btn" class="btn btn-secondary">Lobiye Dön</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Bildirimleri -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/tiles.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
