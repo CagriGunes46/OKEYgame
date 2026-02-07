@@ -206,28 +206,57 @@ const TileRenderer = {
         }
     },
 
-    // Taşları sırala
+    // Taşları sırala - Okey kurallarına göre (önce renk, sonra sayı)
     sortTiles(tiles, sortBy = 'color') {
-        const colorOrder = { yellow: 0, blue: 1, black: 2, red: 3, fake: 4 };
+        const colorOrder = { yellow: 0, blue: 1, black: 2, red: 3 };
 
         return [...tiles].sort((a, b) => {
-            if (sortBy === 'color') {
-                if (a.isFakeOkey) return 1;
-                if (b.isFakeOkey) return -1;
+            // Sahte okey her zaman sona
+            if (a.isFakeOkey && b.isFakeOkey) return 0;
+            if (a.isFakeOkey) return 1;
+            if (b.isFakeOkey) return -1;
 
+            if (sortBy === 'color') {
+                // Önce renge göre, sonra sayıya göre
                 const colorDiff = colorOrder[a.color] - colorOrder[b.color];
                 if (colorDiff !== 0) return colorDiff;
                 return a.number - b.number;
             } else if (sortBy === 'number') {
-                if (a.isFakeOkey) return 1;
-                if (b.isFakeOkey) return -1;
-
+                // Önce sayıya göre, sonra renge göre
                 const numDiff = a.number - b.number;
                 if (numDiff !== 0) return numDiff;
                 return colorOrder[a.color] - colorOrder[b.color];
             }
             return 0;
         });
+    },
+
+    // Akıllı sıralama - Per ve çiftleri gruplar
+    smartSortTiles(tiles, okey = null) {
+        const colorOrder = { yellow: 0, blue: 1, black: 2, red: 3 };
+
+        // Sahte okeyleri ayır
+        const fakeOkeys = tiles.filter(t => t.isFakeOkey);
+        const normalTiles = tiles.filter(t => !t.isFakeOkey);
+
+        // Okeyleri (joker) ayır
+        const okeys = okey ? normalTiles.filter(t =>
+            t.color === okey.color && t.number === okey.number
+        ) : [];
+
+        const otherTiles = okey ? normalTiles.filter(t =>
+            !(t.color === okey.color && t.number === okey.number)
+        ) : normalTiles;
+
+        // Diğer taşları önce renge sonra sayıya göre sırala
+        otherTiles.sort((a, b) => {
+            const colorDiff = colorOrder[a.color] - colorOrder[b.color];
+            if (colorDiff !== 0) return colorDiff;
+            return a.number - b.number;
+        });
+
+        // Okeyleri ve sahte okeyleri sona ekle
+        return [...otherTiles, ...okeys, ...fakeOkeys];
     },
 
     // Seçili taşı değiştir

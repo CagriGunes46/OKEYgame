@@ -53,6 +53,8 @@ class OkeyGameClient {
         this.socket.on('game-started', (data) => {
             this.gameState = data.game;
             this.showScreen('game-screen');
+            // Oda kodunu göster
+            document.getElementById('game-room-code').textContent = this.roomId;
             this.updateGameUI();
             this.showToast('Oyun başladı!', 'success');
         });
@@ -73,6 +75,17 @@ class OkeyGameClient {
         // Oyun bitti
         this.socket.on('game-finished', (data) => {
             this.showResultModal(data.winner);
+        });
+
+        // Oyuncu ayrıldı
+        this.socket.on('player-left', (data) => {
+            this.showToast(`${data.playerName} oyundan ayrıldı`, 'warning');
+
+            // Eğer oyun devam ediyorsa güncelle
+            if (this.gameState && data.game) {
+                this.gameState = data.game;
+                this.updateWaitingRoom();
+            }
         });
     }
 
@@ -147,6 +160,13 @@ class OkeyGameClient {
 
         // Grup alanlarına drop zone ekle
         this.setupGroupDropZones();
+
+        // Çıkış butonu
+        document.getElementById('exit-game-btn').addEventListener('click', () => {
+            if (confirm('Oyundan çıkmak istediğinize emin misiniz?')) {
+                location.reload();
+            }
+        });
 
         // Modal
         document.getElementById('play-again-btn').addEventListener('click', () => {
@@ -295,11 +315,16 @@ class OkeyGameClient {
         });
     }
 
-    // Eli sırala
+    // Eli sırala (Okey kurallarına göre)
     sortHand() {
         if (this.gameState && this.gameState.myHand) {
-            this.gameState.myHand = TileRenderer.sortTiles(this.gameState.myHand, 'color');
+            // Akıllı sıralama: Renge göre grupla, okeyleri sona koy
+            this.gameState.myHand = TileRenderer.smartSortTiles(
+                this.gameState.myHand,
+                this.gameState.okey
+            );
             this.renderPlayerHand();
+            this.showToast('Taşlar sıralandı', 'success');
         }
     }
 
