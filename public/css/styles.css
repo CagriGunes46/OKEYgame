@@ -713,37 +713,43 @@ body {
 
 /* Drag & Drop Reordering */
 .tile.dragging {
-    opacity: 0.5;
-    transform: scale(0.95);
+    opacity: 0.4;
+    transform: scale(0.9);
+    z-index: 100;
 }
 
-.tile.drag-left {
-    transform: translateX(8px);
-    box-shadow: -4px 0 0 var(--accent-primary);
+.tile.drag-over-left {
+    margin-left: 20px;
+    transition: margin 0.15s ease;
 }
 
-.tile.drag-right {
-    transform: translateX(-8px);
-    box-shadow: 4px 0 0 var(--accent-primary);
-}
-
-.tile.drag-left::before,
-.tile.drag-right::before {
+.tile.drag-over-left::after {
     content: '';
     position: absolute;
+    left: -14px;
     top: 0;
     bottom: 0;
-    width: 3px;
+    width: 4px;
     background: var(--accent-primary);
     border-radius: 2px;
+    box-shadow: 0 0 8px var(--accent-primary);
 }
 
-.tile.drag-left::before {
-    left: -6px;
+.tile.drag-over-right {
+    margin-right: 20px;
+    transition: margin 0.15s ease;
 }
 
-.tile.drag-right::before {
-    right: -6px;
+.tile.drag-over-right::after {
+    content: '';
+    position: absolute;
+    right: -14px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--accent-primary);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--accent-primary);
 }
 
 /* Player Hand */
@@ -771,6 +777,110 @@ body {
 .hand-actions {
     display: flex;
     gap: var(--space-md);
+}
+
+.btn-sm {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.85rem;
+}
+
+/* Group Area (Eli Açma) */
+.group-area {
+    width: 100%;
+    max-width: 1000px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    border: 2px solid var(--accent-primary);
+    box-shadow: var(--shadow-glow);
+}
+
+.group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    color: var(--text-secondary);
+}
+
+.groups-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+    justify-content: center;
+}
+
+.tile-group {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    min-width: 120px;
+    min-height: 100px;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    transition: var(--transition-fast);
+}
+
+.tile-group:hover,
+.tile-group.drag-over {
+    border-color: var(--accent-primary);
+    background: rgba(0, 212, 170, 0.1);
+}
+
+.group-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-sm);
+    text-transform: uppercase;
+}
+
+.group-tiles {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-height: 60px;
+    align-items: flex-start;
+}
+
+.group-tiles .tile {
+    cursor: grab;
+}
+
+.group-tiles .tile:active {
+    cursor: grabbing;
+}
+
+/* Kazananın Eli (Modalda) */
+.winner-hand {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    justify-content: center;
+    margin-top: var(--space-lg);
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+}
+
+.winner-group {
+    display: flex;
+    gap: 2px;
+    padding: var(--space-sm);
+    background: rgba(0, 212, 170, 0.1);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--accent-primary);
+}
+
+.winner-group .tile {
+    width: 32px;
+    height: 44px;
+    font-size: 0.9rem;
+    cursor: default;
+}
+
+.winner-group .tile:hover {
+    transform: none;
 }
 
 /* ========================================

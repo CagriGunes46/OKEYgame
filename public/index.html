@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 </head>
+
 <body>
     <!-- Lobi Ekranı -->
     <div id="lobby-screen" class="screen active">
@@ -146,13 +148,48 @@
 
             <!-- Oyuncunun Eli -->
             <div class="player-hand-section">
+                <!-- Grup Alanı (Eli Açmak İçin) -->
+                <div id="group-area" class="group-area hidden">
+                    <div class="group-header">
+                        <span>Taşlarınızı gruplara ayırın (perler ve çiftler)</span>
+                        <button id="cancel-group-btn" class="btn btn-secondary btn-sm">İptal</button>
+                    </div>
+                    <div class="groups-container">
+                        <div class="tile-group" data-group="1">
+                            <span class="group-label">Grup 1</span>
+                            <div class="group-tiles" data-group="1"></div>
+                        </div>
+                        <div class="tile-group" data-group="2">
+                            <span class="group-label">Grup 2</span>
+                            <div class="group-tiles" data-group="2"></div>
+                        </div>
+                        <div class="tile-group" data-group="3">
+                            <span class="group-label">Grup 3</span>
+                            <div class="group-tiles" data-group="3"></div>
+                        </div>
+                        <div class="tile-group" data-group="4">
+                            <span class="group-label">Grup 4</span>
+                            <div class="group-tiles" data-group="4"></div>
+                        </div>
+                        <div class="tile-group" data-group="5">
+                            <span class="group-label">Grup 5</span>
+                            <div class="group-tiles" data-group="5"></div>
+                        </div>
+                    </div>
+                    <button id="confirm-finish-btn" class="btn btn-success btn-large">
+                        <span class="btn-icon">✓</span>
+                        Eli Aç ve Bitir
+                    </button>
+                </div>
+
+                <!-- Normal El Görünümü -->
                 <div id="player-hand" class="player-hand">
                     <!-- Taşlar buraya eklenecek -->
                 </div>
                 <div class="hand-actions">
-                    <button id="finish-btn" class="btn btn-success" disabled>
-                        <span class="btn-icon">✓</span>
-                        Oyunu Bitir
+                    <button id="open-hand-btn" class="btn btn-accent" disabled>
+                        <span class="btn-icon">🃏</span>
+                        Eli Aç
                     </button>
                     <button id="sort-btn" class="btn btn-secondary">
                         <span class="btn-icon">↕</span>
@@ -190,4 +227,5 @@
     <script src="js/tiles.js"></script>
     <script src="js/game.js"></script>
 </body>
+
 </html>

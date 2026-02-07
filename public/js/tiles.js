@@ -13,18 +13,15 @@ const TileRenderer = {
         fake: 'Sahte Okey'
     },
 
-    // Sürükleme durumu
-    dragState: {
-        draggedTile: null,
-        draggedElement: null
-    },
+    // Sürüklenen taş bilgisi
+    draggedTileId: null,
 
     // Taş elementi oluştur
-    createTileElement(tile, options = {}) {
+    createTileElement(tile, index, options = {}) {
         const tileEl = document.createElement('div');
         tileEl.className = 'tile';
         tileEl.dataset.tileId = tile.id;
-        tileEl.dataset.tileIndex = options.index ?? 0;
+        tileEl.dataset.index = index;
 
         if (tile.isFakeOkey) {
             tileEl.classList.add('fake');
@@ -41,86 +38,10 @@ const TileRenderer = {
             tileEl.classList.add('okey');
         }
 
-        // Click handler
-        if (options.selectable) {
-            tileEl.addEventListener('click', (e) => {
-                // Sürükleme sırasında click'i engelle
-                if (this.dragState.draggedTile) return;
-                if (options.onSelect) {
-                    options.onSelect(tile, tileEl);
-                }
-            });
-        }
-
-        // Drag & drop sıralama için
-        if (options.draggable && options.onReorder) {
-            tileEl.draggable = true;
-
-            tileEl.addEventListener('dragstart', (e) => {
-                this.dragState.draggedTile = tile;
-                this.dragState.draggedElement = tileEl;
-                tileEl.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', tile.id);
-            });
-
-            tileEl.addEventListener('dragend', (e) => {
-                tileEl.classList.remove('dragging');
-                this.clearDragIndicators();
-                this.dragState.draggedTile = null;
-                this.dragState.draggedElement = null;
-            });
-
-            tileEl.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-
-                if (this.dragState.draggedElement && this.dragState.draggedElement !== tileEl) {
-                    const rect = tileEl.getBoundingClientRect();
-                    const midX = rect.left + rect.width / 2;
-
-                    // Farenin konumuna göre sola veya sağa yerleştir
-                    if (e.clientX < midX) {
-                        tileEl.classList.add('drag-left');
-                        tileEl.classList.remove('drag-right');
-                    } else {
-                        tileEl.classList.add('drag-right');
-                        tileEl.classList.remove('drag-left');
-                    }
-                }
-            });
-
-            tileEl.addEventListener('dragleave', (e) => {
-                tileEl.classList.remove('drag-left', 'drag-right');
-            });
-
-            tileEl.addEventListener('drop', (e) => {
-                e.preventDefault();
-                tileEl.classList.remove('drag-left', 'drag-right');
-
-                if (this.dragState.draggedTile && this.dragState.draggedTile.id !== tile.id) {
-                    const rect = tileEl.getBoundingClientRect();
-                    const midX = rect.left + rect.width / 2;
-                    const insertBefore = e.clientX < midX;
-
-                    if (options.onReorder) {
-                        options.onReorder(this.dragState.draggedTile, tile, insertBefore);
-                    }
-                }
-            });
-        }
-
         return tileEl;
     },
 
-    // Drag göstergelerini temizle
-    clearDragIndicators() {
-        document.querySelectorAll('.tile.drag-left, .tile.drag-right').forEach(el => {
-            el.classList.remove('drag-left', 'drag-right');
-        });
-    },
-
-    // Elde taşları render et
+    // Elde taşları render et (drag-drop destekli)
     renderHand(container, tiles, okey, options = {}) {
         container.innerHTML = '';
 
@@ -130,24 +51,119 @@ const TileRenderer = {
                 tile.color === okey.color &&
                 tile.number === okey.number;
 
-            const tileEl = this.createTileElement(tile, {
-                ...options,
-                index,
-                isOkey,
-                selectable: true,
-                draggable: true
+            const tileEl = this.createTileElement(tile, index, { isOkey });
+
+            // Click handler - taş atmak için
+            tileEl.addEventListener('click', () => {
+                if (options.onSelect) {
+                    options.onSelect(tile, tileEl);
+                }
+            });
+
+            // Drag start
+            tileEl.draggable = true;
+            tileEl.addEventListener('dragstart', (e) => {
+                this.draggedTileId = tile.id;
+                tileEl.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                // Küçük gecikme ile görselliği iyileştir
+                setTimeout(() => {
+                    tileEl.style.opacity = '0.4';
+                }, 0);
+            });
+
+            // Drag end
+            tileEl.addEventListener('dragend', () => {
+                tileEl.classList.remove('dragging');
+                tileEl.style.opacity = '1';
+                this.draggedTileId = null;
+                // Tüm göstergeleri temizle
+                container.querySelectorAll('.tile').forEach(t => {
+                    t.classList.remove('drag-over-left', 'drag-over-right');
+                });
+            });
+
+            // Drag over - üzerinden geçerken
+            tileEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (this.draggedTileId === null || this.draggedTileId === tile.id) return;
+
+                const rect = tileEl.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+
+                // Önceki göstergeleri temizle
+                container.querySelectorAll('.tile').forEach(t => {
+                    if (t !== tileEl) {
+                        t.classList.remove('drag-over-left', 'drag-over-right');
+                    }
+                });
+
+                // Yeni göstergeyi ekle
+                if (e.clientX < midX) {
+                    tileEl.classList.add('drag-over-left');
+                    tileEl.classList.remove('drag-over-right');
+                } else {
+                    tileEl.classList.add('drag-over-right');
+                    tileEl.classList.remove('drag-over-left');
+                }
+            });
+
+            // Drag leave
+            tileEl.addEventListener('dragleave', () => {
+                tileEl.classList.remove('drag-over-left', 'drag-over-right');
+            });
+
+            // Drop
+            tileEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (this.draggedTileId === null || this.draggedTileId === tile.id) return;
+
+                const rect = tileEl.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                const insertBefore = e.clientX < midX;
+
+                tileEl.classList.remove('drag-over-left', 'drag-over-right');
+
+                if (options.onReorder) {
+                    options.onReorder(this.draggedTileId, tile.id, insertBefore);
+                }
             });
 
             container.appendChild(tileEl);
         });
 
-        // Container drop zone (en sona bırakma için)
+        // Container'a drop (en sona eklemek için)
         container.ondragover = (e) => e.preventDefault();
         container.ondrop = (e) => {
-            if (e.target === container && this.dragState.draggedTile && options.onReorder) {
-                options.onReorder(this.dragState.draggedTile, null, false);
+            if (e.target === container && this.draggedTileId !== null && options.onReorder) {
+                options.onReorder(this.draggedTileId, null, false);
             }
         };
+    },
+
+    // Taşları yeniden sırala (ID'lerle çalışır)
+    reorderTilesById(tiles, draggedId, targetId, insertBefore) {
+        const draggedTile = tiles.find(t => t.id === draggedId);
+        if (!draggedTile) return tiles;
+
+        // Sürüklenen taşı çıkar
+        const newTiles = tiles.filter(t => t.id !== draggedId);
+
+        if (targetId === null) {
+            // En sona ekle
+            newTiles.push(draggedTile);
+        } else {
+            // Hedef konuma ekle
+            const targetIndex = newTiles.findIndex(t => t.id === targetId);
+            if (targetIndex !== -1) {
+                const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+                newTiles.splice(insertIndex, 0, draggedTile);
+            } else {
+                newTiles.push(draggedTile);
+            }
+        }
+
+        return newTiles;
     },
 
     // Rakip taşlarını render et (arka yüz)
@@ -166,7 +182,9 @@ const TileRenderer = {
         container.innerHTML = '';
 
         if (tile) {
-            const tileEl = this.createTileElement(tile, { draggable: false });
+            const tileEl = this.createTileElement(tile, 0, {});
+            tileEl.draggable = false;
+            tileEl.style.cursor = 'default';
             container.appendChild(tileEl);
         }
     },
@@ -181,7 +199,9 @@ const TileRenderer = {
                 tile.color === okey.color &&
                 tile.number === okey.number;
 
-            const tileEl = this.createTileElement(tile, { isOkey, draggable: false });
+            const tileEl = this.createTileElement(tile, 0, { isOkey });
+            tileEl.draggable = false;
+            tileEl.style.cursor = 'default';
             container.appendChild(tileEl);
         }
     },
@@ -210,29 +230,6 @@ const TileRenderer = {
         });
     },
 
-    // Taşı yeniden sırala
-    reorderTiles(tiles, draggedTile, targetTile, insertBefore) {
-        const newTiles = tiles.filter(t => t.id !== draggedTile.id);
-
-        if (targetTile === null) {
-            // En sona ekle
-            newTiles.push(draggedTile);
-        } else {
-            const targetIndex = newTiles.findIndex(t => t.id === targetTile.id);
-            if (targetIndex !== -1) {
-                if (insertBefore) {
-                    newTiles.splice(targetIndex, 0, draggedTile);
-                } else {
-                    newTiles.splice(targetIndex + 1, 0, draggedTile);
-                }
-            } else {
-                newTiles.push(draggedTile);
-            }
-        }
-
-        return newTiles;
-    },
-
     // Seçili taşı değiştir
     toggleTileSelection(tileEl) {
         tileEl.classList.toggle('selected');
@@ -243,15 +240,6 @@ const TileRenderer = {
         container.querySelectorAll('.tile.selected').forEach(el => {
             el.classList.remove('selected');
         });
-    },
-
-    // Seçili taşları al
-    getSelectedTiles(container) {
-        const selected = [];
-        container.querySelectorAll('.tile.selected').forEach(el => {
-            selected.push(parseInt(el.dataset.tileId));
-        });
-        return selected;
     }
 };
 

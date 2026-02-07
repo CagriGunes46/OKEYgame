@@ -127,13 +127,26 @@ class OkeyGameClient {
             this.drawFromDiscard();
         });
 
-        document.getElementById('finish-btn').addEventListener('click', () => {
-            this.finishGame();
+        // Eli Aç butonu
+        document.getElementById('open-hand-btn').addEventListener('click', () => {
+            this.openHandForGrouping();
         });
 
         document.getElementById('sort-btn').addEventListener('click', () => {
             this.sortHand();
         });
+
+        // Grup alanı
+        document.getElementById('cancel-group-btn').addEventListener('click', () => {
+            this.cancelGrouping();
+        });
+
+        document.getElementById('confirm-finish-btn').addEventListener('click', () => {
+            this.finishGame();
+        });
+
+        // Grup alanlarına drop zone ekle
+        this.setupGroupDropZones();
 
         // Modal
         document.getElementById('play-again-btn').addEventListener('click', () => {
@@ -384,9 +397,9 @@ class OkeyGameClient {
         // Oyuncunun eli
         this.renderPlayerHand();
 
-        // Bitir butonu
-        const finishBtn = document.getElementById('finish-btn');
-        finishBtn.disabled = !this.isMyTurn || this.gameState.myHand?.length !== 14;
+        // Eli Aç butonu
+        const openHandBtn = document.getElementById('open-hand-btn');
+        openHandBtn.disabled = !this.isMyTurn || this.gameState.myHand?.length !== 14;
     }
 
     // Rakipleri render et
@@ -436,12 +449,12 @@ class OkeyGameClient {
                             this.selectedTile = tile;
                         }
                     },
-                    onReorder: (draggedTile, targetTile, insertBefore) => {
-                        // Taşları yeniden sırala
-                        this.gameState.myHand = TileRenderer.reorderTiles(
+                    onReorder: (draggedId, targetId, insertBefore) => {
+                        // Taşları yeniden sırala (ID'lerle çalışır)
+                        this.gameState.myHand = TileRenderer.reorderTilesById(
                             this.gameState.myHand,
-                            draggedTile,
-                            targetTile,
+                            draggedId,
+                            targetId,
                             insertBefore
                         );
                         this.renderPlayerHand();
@@ -486,6 +499,139 @@ class OkeyGameClient {
             toast.style.animation = 'slideIn 0.3s ease reverse';
             setTimeout(() => toast.remove(), 300);
         }, 3000);
+    }
+
+    // ============================================
+    // ELİ AÇMA VE GRUPLAMA
+    // ============================================
+
+    // Eli açmak için gruplandırma ekranını göster
+    openHandForGrouping() {
+        if (!this.isMyTurn || this.gameState.myHand?.length !== 14) {
+            this.showToast('Elinizde 14 taş olmalı', 'warning');
+            return;
+        }
+
+        // Grupları temizle
+        this.tileGroups = [[], [], [], [], []];
+
+        // Tüm taşları ilk gruba koy
+        this.tileGroups[0] = [...this.gameState.myHand];
+
+        // Normal eli gizle, grup alanını göster
+        document.getElementById('player-hand').classList.add('hidden');
+        document.querySelector('.hand-actions').classList.add('hidden');
+        document.getElementById('group-area').classList.remove('hidden');
+
+        this.renderGroups();
+    }
+
+    // Gruplandırmayı iptal et
+    cancelGrouping() {
+        document.getElementById('group-area').classList.add('hidden');
+        document.getElementById('player-hand').classList.remove('hidden');
+        document.querySelector('.hand-actions').classList.remove('hidden');
+        this.tileGroups = null;
+    }
+
+    // Grup drop zone'larını ayarla
+    setupGroupDropZones() {
+        const groupContainers = document.querySelectorAll('.group-tiles');
+
+        groupContainers.forEach(container => {
+            container.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                container.parentElement.classList.add('drag-over');
+            });
+
+            container.addEventListener('dragleave', (e) => {
+                container.parentElement.classList.remove('drag-over');
+            });
+
+            container.addEventListener('drop', (e) => {
+                e.preventDefault();
+                container.parentElement.classList.remove('drag-over');
+
+                const tileId = parseInt(e.dataTransfer.getData('text/plain'));
+                const targetGroup = parseInt(container.dataset.group) - 1;
+
+                this.moveTileToGroup(tileId, targetGroup);
+            });
+        });
+    }
+
+    // Taşı gruba taşı
+    moveTileToGroup(tileId, targetGroupIndex) {
+        if (!this.tileGroups) return;
+
+        let tile = null;
+        let sourceGroupIndex = -1;
+
+        // Taşı bul ve eski gruptan çıkar
+        for (let i = 0; i < this.tileGroups.length; i++) {
+            const idx = this.tileGroups[i].findIndex(t => t.id === tileId);
+            if (idx !== -1) {
+                tile = this.tileGroups[i].splice(idx, 1)[0];
+                sourceGroupIndex = i;
+                break;
+            }
+        }
+
+        if (tile && sourceGroupIndex !== targetGroupIndex) {
+            this.tileGroups[targetGroupIndex].push(tile);
+            this.renderGroups();
+        } else if (tile) {
+            // Aynı gruba bırakılmış, geri ekle
+            this.tileGroups[sourceGroupIndex].push(tile);
+        }
+    }
+
+    // Grupları render et
+    renderGroups() {
+        if (!this.tileGroups) return;
+
+        for (let i = 0; i < 5; i++) {
+            const container = document.querySelector(`.group-tiles[data-group="${i + 1}"]`);
+            container.innerHTML = '';
+
+            this.tileGroups[i].forEach(tile => {
+                const isOkey = !tile.isFakeOkey &&
+                    this.gameState.okey &&
+                    tile.color === this.gameState.okey.color &&
+                    tile.number === this.gameState.okey.number;
+
+                const tileEl = TileRenderer.createTileElement(tile, 0, { isOkey });
+                tileEl.draggable = true;
+
+                tileEl.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', tile.id);
+                    tileEl.classList.add('dragging');
+                });
+
+                tileEl.addEventListener('dragend', () => {
+                    tileEl.classList.remove('dragging');
+                });
+
+                container.appendChild(tileEl);
+            });
+
+            // Grup etiketini güncelle
+            const label = container.parentElement.querySelector('.group-label');
+            const count = this.tileGroups[i].length;
+            label.textContent = `Grup ${i + 1} (${count} taş)`;
+        }
+    }
+
+    // Grupları sunucuya gönder
+    getGroupedHand() {
+        if (!this.tileGroups) return null;
+
+        // Boş olmayan grupları al
+        const groups = this.tileGroups
+            .filter(g => g.length > 0)
+            .map(g => g.map(t => t.id));
+
+        return groups;
     }
 }
 
