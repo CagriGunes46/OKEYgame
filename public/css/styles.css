@@ -419,39 +419,48 @@ body {
    Game Screen
    ======================================== */
 
-/* Oyun üst barı */
+/* Oyun üst barı - Küçük ve köşede */
 .game-header {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    bottom: var(--space-md);
+    left: var(--space-md);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-md) var(--space-lg);
-    background: rgba(15, 20, 25, 0.9);
-    backdrop-filter: blur(10px);
+    flex-direction: column;
+    gap: var(--space-sm);
     z-index: 100;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .game-info {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
 }
 
 .room-badge {
-    background: var(--bg-tertiary);
-    padding: var(--space-sm) var(--space-md);
+    background: rgba(15, 20, 25, 0.9);
+    backdrop-filter: blur(10px);
+    padding: var(--space-xs) var(--space-sm);
     border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .room-badge span {
     color: var(--accent-primary);
     font-weight: 600;
+}
+
+/* Küçük çıkış butonu */
+#exit-game-btn {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.7rem;
+    background: rgba(239, 68, 68, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#exit-game-btn .btn-icon {
+    font-size: 0.8rem;
 }
 
 .game-container {
@@ -887,34 +896,84 @@ body {
 }
 
 /* Kazananın Eli (Modalda) */
-.winner-hand {
+.modal-large {
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.hands-display {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hands-display h3,
+.other-hands h3 {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+    text-align: left;
+}
+
+.hand-display {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-md);
+    gap: 4px;
     justify-content: center;
-    margin-top: var(--space-lg);
     padding: var(--space-md);
     background: var(--bg-tertiary);
     border-radius: var(--radius-md);
 }
 
-.winner-group {
-    display: flex;
-    gap: 2px;
-    padding: var(--space-sm);
+.hand-display.winner {
+    border: 2px solid var(--accent-primary);
     background: rgba(0, 212, 170, 0.1);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--accent-primary);
 }
 
-.winner-group .tile {
+.hand-display .tile {
     width: 32px;
     height: 44px;
     font-size: 0.9rem;
     cursor: default;
 }
 
-.winner-group .tile:hover {
+.hand-display .tile:hover {
+    transform: none;
+}
+
+.other-hands {
+    margin-top: var(--space-lg);
+}
+
+.player-hand-row {
+    margin-bottom: var(--space-md);
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+}
+
+.player-hand-row .player-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--space-sm);
+    color: var(--text-secondary);
+}
+
+.player-hand-row .tiles-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.player-hand-row .tile {
+    width: 28px;
+    height: 38px;
+    font-size: 0.8rem;
+    cursor: default;
+}
+
+.player-hand-row .tile:hover {
     transform: none;
 }
 

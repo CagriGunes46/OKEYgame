@@ -125,6 +125,21 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // Ortada taş yoksa oyunu bitir
+        if (room.game.isCenterEmpty()) {
+            const result = room.game.endGameDraw();
+
+            // Tüm oyunculara bildir
+            io.to(socket.roomId).emit('game-ended-draw', {
+                reason: 'Ortadaki taşlar bitti',
+                penalties: result.penalties,
+                winner: room.game.winner
+            });
+
+            callback({ success: false, error: 'Ortada taş kalmadı, oyun bitti' });
+            return;
+        }
+
         const tile = room.game.drawFromCenter(socket.id);
         if (tile) {
             callback({ success: true, tile });
@@ -135,6 +150,18 @@ io.on('connection', (socket) => {
                 from: 'center',
                 game: room.game.getGameState()
             });
+
+            // Taş çektikten sonra ortada taş kaldı mı kontrol et
+            if (room.game.isCenterEmpty()) {
+                const result = room.game.endGameDraw();
+
+                // Tüm oyunculara bildir
+                io.to(socket.roomId).emit('game-ended-draw', {
+                    reason: 'Ortadaki taşlar bitti',
+                    penalties: result.penalties,
+                    winner: room.game.winner
+                });
+            }
         } else {
             callback({ success: false, error: 'Cannot draw' });
         }
@@ -215,15 +242,36 @@ io.on('connection', (socket) => {
         console.log(`Player disconnected: ${socket.id}`);
 
         if (socket.roomId) {
+            const room = roomManager.getRoom(socket.roomId);
+            console.log(`Room found: ${!!room}, Game started: ${room?.game?.gameStarted}`);
+
+            // Oyun devam ediyorsa, oyunu bitir
+            if (room && room.game.gameStarted) {
+                console.log('Ending game because player left...');
+                const result = room.game.endGameByPlayerLeft(socket.id, socket.playerName);
+
+                // Tüm oyunculara bildir ve lobiye gönder
+                io.to(socket.roomId).emit('game-ended-player-left', {
+                    reason: `${socket.playerName} oyundan ayrıldı`,
+                    leftPlayer: socket.playerName,
+                    winner: room.game.winner
+                });
+
+                console.log(`Game ended in room ${socket.roomId} because ${socket.playerName} left`);
+            } else {
+                console.log('Game was not started or room not found, skipping game end');
+            }
+
+            // Odadan çık
             const result = roomManager.leaveRoom(socket.roomId, socket.id);
 
             if (!result.roomDeleted) {
-                const room = roomManager.getRoom(socket.roomId);
-                if (room) {
+                const updatedRoom = roomManager.getRoom(socket.roomId);
+                if (updatedRoom) {
                     io.to(socket.roomId).emit('player-left', {
                         playerId: socket.id,
                         playerName: socket.playerName,
-                        game: room.game.getGameState()
+                        game: updatedRoom.game.getGameState()
                     });
                 }
             }

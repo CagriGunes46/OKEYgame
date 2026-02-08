@@ -215,8 +215,8 @@ class OkeyGame {
                 continue;
             }
 
-            if (i + 1 < sorted.length && 
-                sorted[i].color === sorted[i + 1].color && 
+            if (i + 1 < sorted.length &&
+                sorted[i].color === sorted[i + 1].color &&
                 sorted[i].number === sorted[i + 1].number) {
                 pairs++;
                 i += 2;
@@ -258,7 +258,7 @@ class OkeyGame {
         const restTiles = normalTiles.slice(1);
 
         // 1. Aynı sayı farklı renk (set)
-        const sameNumberTiles = normalTiles.filter(t => 
+        const sameNumberTiles = normalTiles.filter(t =>
             t.number === firstTile.number && t.color !== firstTile.color
         );
 
@@ -276,11 +276,11 @@ class OkeyGame {
         // 2. Aynı renk ardışık sayılar (run)
         const sameColorTiles = normalTiles.filter(t => t.color === firstTile.color);
         const sortedByNumber = sameColorTiles.sort((a, b) => a.number - b.number);
-        
+
         // Ardışık seri bul
         const run = [firstTile];
         for (let i = 0; i < sortedByNumber.length; i++) {
-            const next = sortedByNumber.find(t => 
+            const next = sortedByNumber.find(t =>
                 t.number === run[run.length - 1].number + 1 && !run.includes(t)
             );
             if (next) {
@@ -339,11 +339,25 @@ class OkeyGame {
 
         // Skor hesapla
         const score = this.calculateScore(playerId, result.type);
+
+        // Kazananın eli
+        const winnerHand = [...hand];
+
+        // Tüm oyuncuların ellerini topla
+        const allHands = this.players.map(p => ({
+            playerId: p.id,
+            playerName: p.name,
+            hand: [...p.hand],
+            isWinner: p.id === playerId
+        }));
+
         this.winner = {
             playerId,
             playerName: this.players[playerIndex].name,
             score,
-            type: result.type
+            type: result.type,
+            hand: winnerHand,
+            allHands: allHands
         };
 
         this.gameStarted = false;
@@ -359,7 +373,7 @@ class OkeyGame {
         const hand = player.hand;
 
         // Sahte okey bonusu: Gerçek okeyi kullanmadan kazanırsa
-        const realOkeyUsed = hand.some(t => 
+        const realOkeyUsed = hand.some(t =>
             !t.isFakeOkey && t.color === this.okey.color && t.number === this.okey.number
         );
         const fakeOkeyUsed = hand.some(t => t.isFakeOkey);
@@ -369,7 +383,7 @@ class OkeyGame {
         }
 
         // Çift okey bonusu: 2 gerçek okey ile bitirme
-        const realOkeyCount = hand.filter(t => 
+        const realOkeyCount = hand.filter(t =>
             !t.isFakeOkey && t.color === this.okey.color && t.number === this.okey.number
         ).length;
 
@@ -383,6 +397,75 @@ class OkeyGame {
         }
 
         return baseScore;
+    }
+
+    // Taş bittiğinde oyunu bitir (berabere/ceza hesabı)
+    endGameDraw() {
+        this.gameStarted = false;
+
+        // Her oyuncunun cezasını hesapla
+        const penalties = this.players.map(player => {
+            let penalty = 0;
+
+            player.hand.forEach(tile => {
+                if (tile.isFakeOkey) {
+                    // Sahte okey cezası yok (101 olarak da oynanabilir ama 0 sayalım)
+                    penalty += 0;
+                } else if (this.isOkey(tile)) {
+                    // Okey cezası yok
+                    penalty += 0;
+                } else {
+                    // Normal taşlar değeri kadar ceza
+                    penalty += tile.number;
+                }
+            });
+
+            return {
+                playerId: player.id,
+                playerName: player.name,
+                hand: [...player.hand],
+                penalty: penalty
+            };
+        });
+
+        // En düşük cezalı oyuncu "yarı kazanan" sayılabilir
+        const minPenalty = Math.min(...penalties.map(p => p.penalty));
+
+        this.winner = {
+            type: 'draw',
+            reason: 'Ortadaki taşlar bitti',
+            penalties: penalties,
+            allHands: penalties
+        };
+
+        return { success: true, type: 'draw', penalties: penalties };
+    }
+
+    // Oyuncu çıktığında oyunu bitir
+    endGameByPlayerLeft(leftPlayerId, leftPlayerName) {
+        this.gameStarted = false;
+
+        // Tüm oyuncuların ellerini topla
+        const allHands = this.players.map(p => ({
+            playerId: p.id,
+            playerName: p.name,
+            hand: [...p.hand],
+            isLeft: p.id === leftPlayerId
+        }));
+
+        this.winner = {
+            type: 'player_left',
+            reason: `${leftPlayerName} oyundan ayrıldı`,
+            leftPlayer: leftPlayerName,
+            allHands: allHands
+        };
+
+        return { success: true, type: 'player_left', leftPlayer: leftPlayerName };
+    }
+
+    // Ortada taş kaldı mı kontrol et
+    isCenterEmpty() {
+        return this.centerTiles.length === 0;
     }
 
     // Oyun durumunu al

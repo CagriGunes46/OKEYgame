@@ -213,7 +213,7 @@
 
     <!-- Sonuç Modalı -->
     <div id="result-modal" class="modal hidden">
-        <div class="modal-content">
+        <div class="modal-content modal-large">
             <div class="modal-header">
                 <h2 id="result-title">🎉 Kazanan!</h2>
             </div>
@@ -223,6 +223,18 @@
                     <span class="winner-score" id="winner-score"></span>
                 </div>
                 <div class="score-details" id="score-details"></div>
+
+                <!-- Kazananın Eli -->
+                <div class="hands-display">
+                    <h3>🏆 Kazananın Eli</h3>
+                    <div id="winner-hand-display" class="hand-display winner"></div>
+                </div>
+
+                <!-- Diğer Oyuncuların Elleri -->
+                <div class="other-hands">
+                    <h3>📊 Diğer Oyuncular</h3>
+                    <div id="other-hands-display"></div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button id="play-again-btn" class="btn btn-primary">Tekrar Oyna</button>

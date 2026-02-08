@@ -12,8 +12,37 @@ class OkeyGameClient {
         this.selectedTile = null;
         this.isMyTurn = false;
         this.hasDrawn = false;
+        this.localHandOrder = null; // Kullanıcının taş sıralamasını korur
 
         this.init();
+    }
+
+    // Sunucudan gelen eli, kullanıcının sıralamasıyla birleştir
+    mergeHandWithOrder(serverHand) {
+        if (!serverHand) return null;
+
+        // İlk kez veya lokal sıralama yoksa sunucunun sıralamasını kullan
+        if (!this.localHandOrder || this.localHandOrder.length === 0) {
+            this.localHandOrder = serverHand.map(t => t.id);
+            return serverHand;
+        }
+
+        // Sunucudaki taş ID'leri
+        const serverIds = new Set(serverHand.map(t => t.id));
+
+        // Lokal sıralamadan kaldırılmış taşları çıkar
+        this.localHandOrder = this.localHandOrder.filter(id => serverIds.has(id));
+
+        // Yeni taşları bul (sunucuda var ama lokalde yok)
+        const localIds = new Set(this.localHandOrder);
+        const newTiles = serverHand.filter(t => !localIds.has(t.id));
+
+        // Yeni taşları sona ekle
+        newTiles.forEach(t => this.localHandOrder.push(t.id));
+
+        // Eli lokal sıralamaya göre yeniden oluştur
+        const tileMap = new Map(serverHand.map(t => [t.id, t]));
+        return this.localHandOrder.map(id => tileMap.get(id)).filter(t => t);
     }
 
     // Başlat
@@ -51,7 +80,9 @@ class OkeyGameClient {
 
         // Oyun başladı
         this.socket.on('game-started', (data) => {
+            this.localHandOrder = null; // Yeni oyun, sıralamayı sıfırla
             this.gameState = data.game;
+            this.gameState.myHand = this.mergeHandWithOrder(data.game.myHand);
             this.showScreen('game-screen');
             // Oda kodunu göster
             document.getElementById('game-room-code').textContent = this.roomId;
@@ -61,13 +92,19 @@ class OkeyGameClient {
 
         // Oyuncu taş çekti
         this.socket.on('player-drew', (data) => {
+            // Elimizi koruyarak güncelle
+            const preservedHand = this.mergeHandWithOrder(data.game.myHand);
             this.gameState = data.game;
+            this.gameState.myHand = preservedHand;
             this.updateGameUI();
         });
 
         // Taş atıldı
         this.socket.on('tile-discarded', (data) => {
+            // Elimizi koruyarak güncelle
+            const preservedHand = this.mergeHandWithOrder(data.game.myHand);
             this.gameState = data.game;
+            this.gameState.myHand = preservedHand;
             this.hasDrawn = false;
             this.updateGameUI();
         });
@@ -86,6 +123,18 @@ class OkeyGameClient {
                 this.gameState = data.game;
                 this.updateWaitingRoom();
             }
+        });
+
+        // Taşlar bitti - berabere
+        this.socket.on('game-ended-draw', (data) => {
+            console.log('Game ended - draw:', data);
+            this.showDrawResultModal(data.winner, data.penalties);
+        });
+
+        // Oyuncu çıktı - oyun bitti
+        this.socket.on('game-ended-player-left', (data) => {
+            console.log('Game ended - player left:', data);
+            this.showPlayerLeftModal(data.leftPlayer, data.winner);
         });
     }
 
@@ -387,6 +436,12 @@ class OkeyGameClient {
         // Sıra kontrolü
         this.isMyTurn = this.gameState.currentPlayerId === this.socket.id;
 
+        // 15 taşlı ilk oyuncu kontrolü (taş çekmiş sayılır)
+        // 1. oyuncu 15 taşla başlar ve direkt taş atmalıdır
+        if (this.isMyTurn && this.gameState.myHand?.length === 15) {
+            this.hasDrawn = true; // 15 taşı olan oyuncu taş çekmiş gibi işlem görür
+        }
+
         // Gösterge ve okey bilgisi
         const indicatorContainer = document.getElementById('indicator-tile');
         TileRenderer.renderIndicator(indicatorContainer, this.gameState.indicator);
@@ -482,6 +537,8 @@ class OkeyGameClient {
                             targetId,
                             insertBefore
                         );
+                        // Lokal sıralamayı güncelle (sunucu güncellemelerinde korunması için)
+                        this.localHandOrder = this.gameState.myHand.map(t => t.id);
                         this.renderPlayerHand();
                     }
                 }
@@ -503,12 +560,143 @@ class OkeyGameClient {
         }
         document.getElementById('score-details').textContent = details.join(' | ') || 'Klasik kazanç';
 
+        // Kazananın elini göster
+        const winnerHandContainer = document.getElementById('winner-hand-display');
+        winnerHandContainer.innerHTML = '';
+
+        if (winner.hand && winner.hand.length > 0) {
+            winner.hand.forEach(tile => {
+                const isOkey = !tile.isFakeOkey &&
+                    this.gameState.okey &&
+                    tile.color === this.gameState.okey.color &&
+                    tile.number === this.gameState.okey.number;
+
+                const tileEl = TileRenderer.createTileElement(tile, 0, { isOkey });
+                tileEl.draggable = false;
+                winnerHandContainer.appendChild(tileEl);
+            });
+        }
+
+        // Diğer oyuncuların ellerini göster
+        const otherHandsContainer = document.getElementById('other-hands-display');
+        otherHandsContainer.innerHTML = '';
+
+        if (winner.allHands && winner.allHands.length > 0) {
+            winner.allHands
+                .filter(p => !p.isWinner) // Kazananı atla
+                .forEach(playerData => {
+                    const row = document.createElement('div');
+                    row.className = 'player-hand-row';
+
+                    const label = document.createElement('span');
+                    label.className = 'player-label';
+                    label.textContent = playerData.playerName;
+                    row.appendChild(label);
+
+                    const tilesRow = document.createElement('div');
+                    tilesRow.className = 'tiles-row';
+
+                    if (playerData.hand && playerData.hand.length > 0) {
+                        playerData.hand.forEach(tile => {
+                            const isOkey = !tile.isFakeOkey &&
+                                this.gameState.okey &&
+                                tile.color === this.gameState.okey.color &&
+                                tile.number === this.gameState.okey.number;
+
+                            const tileEl = TileRenderer.createTileElement(tile, 0, { isOkey });
+                            tileEl.draggable = false;
+                            tilesRow.appendChild(tileEl);
+                        });
+                    }
+
+                    row.appendChild(tilesRow);
+                    otherHandsContainer.appendChild(row);
+                });
+        }
+
         document.getElementById('result-modal').classList.remove('hidden');
     }
 
     // Sonuç modalını gizle
     hideResultModal() {
         document.getElementById('result-modal').classList.add('hidden');
+    }
+
+    // Taşlar bittiğinde modal göster (berabere)
+    showDrawResultModal(winner, penalties) {
+        document.getElementById('result-title').textContent = '⚖️ Taşlar Bitti!';
+        document.getElementById('winner-name').textContent = 'Berabere';
+        document.getElementById('winner-score').textContent = 'Ceza Puanları';
+        document.getElementById('score-details').textContent = 'Ortadaki taşlar tükendi';
+
+        // Kazananın elini temizle (kazanan yok)
+        const winnerHandContainer = document.getElementById('winner-hand-display');
+        winnerHandContainer.innerHTML = '<p style="color: var(--text-muted);">Kazanan yok</p>';
+
+        // Tüm oyuncuların ceza puanlarını göster
+        const otherHandsContainer = document.getElementById('other-hands-display');
+        otherHandsContainer.innerHTML = '';
+
+        if (penalties && penalties.length > 0) {
+            // Ceza puanına göre sırala (en düşük en üstte)
+            const sortedPenalties = [...penalties].sort((a, b) => a.penalty - b.penalty);
+
+            sortedPenalties.forEach((playerData, index) => {
+                const row = document.createElement('div');
+                row.className = 'player-hand-row';
+                if (index === 0) row.style.border = '2px solid var(--accent-primary)';
+
+                const label = document.createElement('span');
+                label.className = 'player-label';
+                label.innerHTML = `${index === 0 ? '🥇 ' : ''}${playerData.playerName} <span style="color: var(--error); margin-left: 10px;">-${playerData.penalty} puan</span>`;
+                row.appendChild(label);
+
+                const tilesRow = document.createElement('div');
+                tilesRow.className = 'tiles-row';
+
+                if (playerData.hand && playerData.hand.length > 0) {
+                    playerData.hand.forEach(tile => {
+                        const isOkey = !tile.isFakeOkey &&
+                            this.gameState.okey &&
+                            tile.color === this.gameState.okey.color &&
+                            tile.number === this.gameState.okey.number;
+
+                        const tileEl = TileRenderer.createTileElement(tile, 0, { isOkey });
+                        tileEl.draggable = false;
+                        tilesRow.appendChild(tileEl);
+                    });
+                }
+
+                row.appendChild(tilesRow);
+                otherHandsContainer.appendChild(row);
+            });
+        }
+
+        document.getElementById('result-modal').classList.remove('hidden');
+    }
+
+    // Oyuncu çıktığında modal göster
+    showPlayerLeftModal(leftPlayer, winner) {
+        document.getElementById('result-title').textContent = '🚪 Oyun Sonlandırıldı';
+        document.getElementById('winner-name').textContent = `${leftPlayer} oyunu terk etti`;
+        document.getElementById('winner-score').textContent = '';
+        document.getElementById('score-details').textContent = 'Oyun iptal edildi';
+
+        // El gösterimlerini temizle
+        document.getElementById('winner-hand-display').innerHTML =
+            '<p style="color: var(--text-muted);">Oyun tamamlanmadan bitti</p>';
+        document.getElementById('other-hands-display').innerHTML = '';
+
+        document.getElementById('result-modal').classList.remove('hidden');
+
+        // 5 saniye sonra lobiye dön
+        this.showToast('5 saniye içinde lobiye yönlendiriliyorsunuz...', 'warning');
+        setTimeout(() => {
+            this.hideResultModal();
+            this.showScreen('lobby-screen');
+            this.gameState = null;
+            this.localHandOrder = null;
+        }, 5000);
     }
 
     // Toast bildirimi göster
