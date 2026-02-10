@@ -821,6 +821,129 @@ body {
 .hand-actions {
     display: flex;
     gap: var(--space-md);
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.sort-buttons {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.btn-sort {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-sort:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+}
+
+.btn-sort:active {
+    transform: scale(0.95);
+}
+
+.btn-sort-smart {
+    border-color: rgba(0, 212, 170, 0.3);
+    color: var(--accent-primary);
+}
+
+/* Touch Drag Ghost Element */
+.tile-ghost {
+    border: 2px solid var(--accent-primary) !important;
+    animation: ghostPulse 0.6s ease infinite alternate;
+}
+
+@keyframes ghostPulse {
+    from {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    to {
+        box-shadow: 0 8px 25px rgba(0, 212, 170, 0.4);
+    }
+}
+
+/* Mobil touch için scroll engelle (taş sürüklerken) */
+.player-hand {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.player-hand .tile {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* ========================================
+   Mobil Uyumluluk
+   ======================================== */
+@media (max-width: 768px) {
+    .player-hand {
+        gap: 2px;
+        padding: var(--space-sm);
+        min-height: 70px;
+    }
+
+    .player-hand .tile {
+        width: 36px;
+        height: 50px;
+        font-size: 0.85rem;
+    }
+
+    .hand-actions {
+        gap: var(--space-sm);
+    }
+
+    .btn-sort {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+
+    #open-hand-btn {
+        padding: var(--space-xs) var(--space-sm);
+        font-size: 0.75rem;
+    }
+
+    .game-container {
+        grid-template-rows: 60px 1fr 1fr auto;
+    }
+
+    .opponent-section .tile {
+        width: 16px;
+        height: 22px;
+    }
+}
+
+@media (max-width: 480px) {
+    .player-hand .tile {
+        width: 30px;
+        height: 42px;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+
+    .sort-buttons {
+        gap: 2px;
+    }
+
+    .btn-sort {
+        padding: 3px 6px;
+        font-size: 0.65rem;
+    }
 }
 
 .btn-sm {

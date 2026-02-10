@@ -92,10 +92,18 @@ class OkeyGameClient {
 
         // Oyuncu taş çekti
         this.socket.on('player-drew', (data) => {
-            // Elimizi koruyarak güncelle
-            const preservedHand = this.mergeHandWithOrder(data.game.myHand);
-            this.gameState = data.game;
-            this.gameState.myHand = preservedHand;
+            // Kendi çektiğimiz taşı zaten callback'te ekledik, tekrar eklemeyelim
+            if (data.playerId === this.socket.id) {
+                // Sadece diğer bilgileri güncelle (centerTilesCount vb.)
+                const myHand = this.gameState.myHand;
+                this.gameState = data.game;
+                this.gameState.myHand = myHand;
+            } else {
+                // Başka oyuncu çekti, elimizi koruyarak güncelle
+                const preservedHand = this.mergeHandWithOrder(data.game.myHand);
+                this.gameState = data.game;
+                this.gameState.myHand = preservedHand;
+            }
             this.updateGameUI();
         });
 
@@ -196,6 +204,14 @@ class OkeyGameClient {
 
         document.getElementById('sort-btn').addEventListener('click', () => {
             this.sortHand();
+        });
+
+        document.getElementById('sort-color-btn').addEventListener('click', () => {
+            this.sortHandByColor();
+        });
+
+        document.getElementById('sort-number-btn').addEventListener('click', () => {
+            this.sortHandByNumber();
         });
 
         // Grup alanı
@@ -299,6 +315,10 @@ class OkeyGameClient {
         this.socket.emit('draw-center', (response) => {
             if (response.success) {
                 this.gameState.myHand.push(response.tile);
+                // Lokal sıralamaya da ekle
+                if (this.localHandOrder) {
+                    this.localHandOrder.push(response.tile.id);
+                }
                 this.hasDrawn = true;
                 this.updateGameUI();
             } else {
@@ -317,6 +337,10 @@ class OkeyGameClient {
         this.socket.emit('draw-discard', (response) => {
             if (response.success) {
                 this.gameState.myHand.push(response.tile);
+                // Lokal sıralamaya da ekle
+                if (this.localHandOrder) {
+                    this.localHandOrder.push(response.tile.id);
+                }
                 this.hasDrawn = true;
                 this.updateGameUI();
             } else {
@@ -334,7 +358,10 @@ class OkeyGameClient {
 
         this.socket.emit('discard-tile', tileId, (response) => {
             if (response.success) {
+                // Elimizi koruyarak güncelle (sıralama kaybolmasın)
+                const preservedHand = this.mergeHandWithOrder(response.game.myHand);
                 this.gameState = response.game;
+                this.gameState.myHand = preservedHand;
                 this.hasDrawn = false;
                 this.updateGameUI();
             } else {
@@ -364,16 +391,36 @@ class OkeyGameClient {
         });
     }
 
-    // Eli sırala (Okey kurallarına göre)
+    // Eli sırala (Okey kurallarına göre - Akıllı)
     sortHand() {
         if (this.gameState && this.gameState.myHand) {
-            // Akıllı sıralama: Renge göre grupla, okeyleri sona koy
             this.gameState.myHand = TileRenderer.smartSortTiles(
                 this.gameState.myHand,
                 this.gameState.okey
             );
+            this.localHandOrder = this.gameState.myHand.map(t => t.id);
             this.renderPlayerHand();
-            this.showToast('Taşlar sıralandı', 'success');
+            this.showToast('Akıllı sıralama yapıldı', 'success');
+        }
+    }
+
+    // Renge göre sırala
+    sortHandByColor() {
+        if (this.gameState && this.gameState.myHand) {
+            this.gameState.myHand = TileRenderer.sortTiles(this.gameState.myHand, 'color');
+            this.localHandOrder = this.gameState.myHand.map(t => t.id);
+            this.renderPlayerHand();
+            this.showToast('Renge göre sıralandı', 'success');
+        }
+    }
+
+    // Sayıya göre sırala
+    sortHandByNumber() {
+        if (this.gameState && this.gameState.myHand) {
+            this.gameState.myHand = TileRenderer.sortTiles(this.gameState.myHand, 'number');
+            this.localHandOrder = this.gameState.myHand.map(t => t.id);
+            this.renderPlayerHand();
+            this.showToast('Sayıya göre sıralandı', 'success');
         }
     }
 

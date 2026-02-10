@@ -249,75 +249,110 @@ class OkeyGame {
         }
 
         if (normalTiles.length === 0) {
-            // Sadece okeyler kaldı, gruplara eklenebilir mi?
-            return okeys.length % 3 === 0 || groups.some(g => g.length + okeys.length >= 3);
+            // Sadece okeyler kaldı - mevcut gruplara eklenebilir
+            if (groups.length > 0 && groups.every(g => g.length >= 3)) {
+                return true; // Okeyler fazlalık, gruplar zaten geçerli
+            }
+            // Kendi başına 3'lü grup olabilir mi
+            return okeys.length >= 3 && okeys.length % 3 === 0;
         }
 
-        // İlk taşı al ve gruplar oluşturmayı dene
+        // İlk normal taşı al
         const firstTile = normalTiles[0];
-        const restTiles = normalTiles.slice(1);
 
-        // 1. Aynı sayı farklı renk (set)
+        // 1. Aynı sayı farklı renk (SET) denemeleri
         const sameNumberTiles = normalTiles.filter(t =>
-            t.number === firstTile.number && t.color !== firstTile.color
+            t.number === firstTile.number && t.id !== firstTile.id
         );
 
-        if (sameNumberTiles.length >= 2) {
-            // 3'lü veya 4'lü set oluştur
-            for (let len = 2; len <= Math.min(3, sameNumberTiles.length); len++) {
-                const set = [firstTile, ...sameNumberTiles.slice(0, len)];
-                const newRemaining = remaining.filter(t => !set.includes(t));
-                if (this.tryFormGroups(newRemaining, [...groups, set])) {
-                    return true;
-                }
+        // Aynı sayıdan farklı renkleri bul (aynı renk tekrarı olmasın)
+        const uniqueColorTiles = [firstTile];
+        const usedColors = new Set([firstTile.color]);
+        for (const t of sameNumberTiles) {
+            if (!usedColors.has(t.color)) {
+                uniqueColorTiles.push(t);
+                usedColors.add(t.color);
             }
         }
 
-        // 2. Aynı renk ardışık sayılar (run)
-        const sameColorTiles = normalTiles.filter(t => t.color === firstTile.color);
-        const sortedByNumber = sameColorTiles.sort((a, b) => a.number - b.number);
+        // 3'lü ve 4'lü set denemeleri
+        if (uniqueColorTiles.length >= 3) {
+            // 3'lü set
+            const set3 = uniqueColorTiles.slice(0, 3);
+            const newRemaining3 = remaining.filter(t => !set3.includes(t));
+            if (this.tryFormGroups(newRemaining3, [...groups, set3])) return true;
 
-        // Ardışık seri bul
+            // 4'lü set
+            if (uniqueColorTiles.length >= 4) {
+                const set4 = uniqueColorTiles.slice(0, 4);
+                const newRemaining4 = remaining.filter(t => !set4.includes(t));
+                if (this.tryFormGroups(newRemaining4, [...groups, set4])) return true;
+            }
+        }
+
+        // Okey ile set tamamla (2 farklı renk + 1 okey = 3'lü set)
+        if (uniqueColorTiles.length >= 2 && okeys.length > 0) {
+            const set = [uniqueColorTiles[0], uniqueColorTiles[1], okeys[0]];
+            const newRemaining = remaining.filter(t => !set.includes(t));
+            if (this.tryFormGroups(newRemaining, [...groups, set])) return true;
+        }
+
+        // 2. Aynı renk ardışık sayılar (RUN) denemeleri
+        const sameColorTiles = normalTiles
+            .filter(t => t.color === firstTile.color)
+            .sort((a, b) => a.number - b.number);
+
+        // firstTile'dan başlayarak ardışık seri bul
         const run = [firstTile];
-        for (let i = 0; i < sortedByNumber.length; i++) {
-            const next = sortedByNumber.find(t =>
-                t.number === run[run.length - 1].number + 1 && !run.includes(t)
-            );
+        let lastNum = firstTile.number;
+
+        for (let n = firstTile.number + 1; n <= 13; n++) {
+            const next = sameColorTiles.find(t => t.number === n && !run.includes(t));
             if (next) {
                 run.push(next);
+                lastNum = n;
             } else {
                 break;
             }
         }
 
+        // Run denemelerini yap (3'lü, 4'lü, 5'li, vb.)
         if (run.length >= 3) {
-            for (let len = 3; len <= run.length; len++) {
+            for (let len = run.length; len >= 3; len--) {
                 const subset = run.slice(0, len);
                 const newRemaining = remaining.filter(t => !subset.includes(t));
-                if (this.tryFormGroups(newRemaining, [...groups, subset])) {
-                    return true;
-                }
+                if (this.tryFormGroups(newRemaining, [...groups, subset])) return true;
             }
         }
 
-        // 3. Okey kullanarak grup tamamla
+        // Okey ile run tamamla
+        if (okeys.length > 0 && run.length >= 2) {
+            // Okey'i sona ekle
+            const runWithOkey = [...run.slice(0, 2), okeys[0]];
+            const newRemaining = remaining.filter(t => !runWithOkey.includes(t));
+            if (this.tryFormGroups(newRemaining, [...groups, runWithOkey])) return true;
+        }
+
+        // Okey ile 2'li çift + okey = 3'lü run (ardışık 2 taş + okey)
         if (okeys.length > 0) {
-            // Set tamamla
-            if (sameNumberTiles.length >= 1) {
-                const set = [firstTile, ...sameNumberTiles.slice(0, 1), okeys[0]];
-                const newRemaining = remaining.filter(t => !set.includes(t));
-                if (this.tryFormGroups(newRemaining, [...groups, set])) {
-                    return true;
-                }
+            // firstTile'ın bir sonrası var mı?
+            const nextTile = sameColorTiles.find(t =>
+                t.number === firstTile.number + 1 && t.id !== firstTile.id
+            );
+            if (nextTile) {
+                const runWithOkey = [firstTile, nextTile, okeys[0]];
+                const newRemaining = remaining.filter(t => !runWithOkey.includes(t));
+                if (this.tryFormGroups(newRemaining, [...groups, runWithOkey])) return true;
             }
 
-            // Run tamamla
-            if (run.length >= 2) {
-                const runWithOkey = [...run.slice(0, 2), okeys[0]];
+            // Bir boşluk bırakıp okeyle doldurmak (ör: 3-okey-5)
+            const gapTile = sameColorTiles.find(t =>
+                t.number === firstTile.number + 2 && t.id !== firstTile.id
+            );
+            if (gapTile) {
+                const runWithOkey = [firstTile, okeys[0], gapTile];
                 const newRemaining = remaining.filter(t => !runWithOkey.includes(t));
-                if (this.tryFormGroups(newRemaining, [...groups, runWithOkey])) {
-                    return true;
-                }
+                if (this.tryFormGroups(newRemaining, [...groups, runWithOkey])) return true;
             }
         }
 
