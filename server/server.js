@@ -8,6 +8,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { RoomManager } = require('./roomManager');
+const { BotPlayer } = require('./botPlayer');
+
+// Bot yöneticileri (roomId -> BotPlayer instance)
+const botManagers = new Map();
 
 const app = express();
 const server = http.createServer(app);
@@ -83,6 +87,35 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Bot ekle
+    socket.on('add-bot', (callback) => {
+        const room = roomManager.getRoom(socket.roomId);
+        if (!room) {
+            callback({ success: false, error: 'Room not found' });
+            return;
+        }
+
+        if (room.host !== socket.id) {
+            callback({ success: false, error: 'Sadece oda sahibi bot ekleyebilir' });
+            return;
+        }
+
+        const result = roomManager.addBot(socket.roomId);
+        if (result.success) {
+            // Tüm oyunculara bildir
+            io.to(socket.roomId).emit('player-joined', {
+                playerId: result.botPlayer.id,
+                playerName: result.botPlayer.name,
+                game: room.game.getGameState()
+            });
+
+            callback({ success: true, botPlayer: result.botPlayer });
+            console.log(`Bot added to room ${socket.roomId}: ${result.botPlayer.name}`);
+        } else {
+            callback({ success: false, error: result.error });
+        }
+    });
+
     // Oyunu başlat
     socket.on('start-game', (callback) => {
         const room = roomManager.getRoom(socket.roomId);
@@ -103,15 +136,27 @@ io.on('connection', (socket) => {
 
         const started = room.game.startGame();
         if (started) {
+            // Bot yöneticisini oluştur
+            const botManager = new BotPlayer(room.game, io, socket.roomId);
+            botManagers.set(socket.roomId, botManager);
+
             // Her oyuncuya kendi elini gönder
             room.game.players.forEach(player => {
-                io.to(player.id).emit('game-started', {
-                    game: room.game.getGameState(player.id)
-                });
+                if (!player.isBot) {
+                    io.to(player.id).emit('game-started', {
+                        game: room.game.getGameState(player.id)
+                    });
+                }
             });
 
             callback({ success: true });
             console.log(`Game started in room: ${socket.roomId}`);
+
+            // İlk tur bota mı geliyor?
+            const firstPlayer = room.game.players[room.game.currentPlayerIndex];
+            if (firstPlayer && firstPlayer.isBot) {
+                botManager.playTurn(firstPlayer.id);
+            }
         } else {
             callback({ success: false, error: 'Could not start game' });
         }
@@ -203,25 +248,44 @@ io.on('connection', (socket) => {
 
             // Tüm oyunculara yayınla
             room.game.players.forEach(player => {
-                io.to(player.id).emit('tile-discarded', {
-                    playerId: socket.id,
-                    game: room.game.getGameState(player.id)
-                });
+                if (!player.isBot) {
+                    io.to(player.id).emit('tile-discarded', {
+                        playerId: socket.id,
+                        game: room.game.getGameState(player.id)
+                    });
+                }
             });
+
+            // Sıradaki oyuncu bot mu?
+            const nextPlayer = room.game.players[room.game.currentPlayerIndex];
+            if (nextPlayer && nextPlayer.isBot && room.game.gameStarted) {
+                const botManager = botManagers.get(socket.roomId);
+                if (botManager) {
+                    botManager.playTurn(nextPlayer.id);
+                }
+            }
         } else {
             callback({ success: false, error: 'Cannot discard' });
         }
     });
 
     // Oyunu bitir
-    socket.on('finish-game', (callback) => {
+    socket.on('finish-game', (data, callback) => {
+        // data varsa grupları al, yoksa callback olarak kullan (geriye uyumluluk)
+        let groups = null;
+        if (typeof data === 'function') {
+            callback = data;
+        } else if (data && data.groups) {
+            groups = data.groups;
+        }
+
         const room = roomManager.getRoom(socket.roomId);
         if (!room) {
             callback({ success: false, error: 'Room not found' });
             return;
         }
 
-        const result = room.game.finishGame(socket.id);
+        const result = room.game.finishGame(socket.id, groups);
         if (result && result.success) {
             callback({ success: true, winner: result.winner });
 

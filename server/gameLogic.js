@@ -27,7 +27,8 @@ class OkeyGame {
             id: player.id,
             name: player.name,
             hand: [],
-            isReady: false
+            isReady: false,
+            isBot: player.isBot || false
         });
         return true;
     }
@@ -162,7 +163,7 @@ class OkeyGame {
         this.discardPile.push(tile);
 
         // Sıra sonraki oyuncuya geçer
-        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % 4;
+        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
 
         return true;
     }
@@ -175,12 +176,32 @@ class OkeyGame {
 
     // Eli kontrol et (geçerli mi?)
     checkHand(hand) {
-        // 14 taş olmalı
-        if (hand.length !== 14) return { valid: false, reason: 'Hand must have 14 tiles' };
+        // 14 taş -> doğrudan kontrol
+        if (hand.length === 14) {
+            const result = this.findValidCombination(hand);
+            return result;
+        }
 
-        // Tüm kombinasyonları dene
-        const result = this.findValidCombination(hand);
-        return result;
+        // 14'ten az taş -> geçersiz
+        if (hand.length < 14) {
+            return { valid: false, reason: 'Elinizde en az 14 taş olmalı' };
+        }
+
+        // 15+ taş -> her taşı sırayla çıkarıp 14'lü kontrol et
+        for (let i = 0; i < hand.length; i++) {
+            const remaining = [...hand.slice(0, i), ...hand.slice(i + 1)];
+            // 14 taş kaldıysa kontrol et, yoksa recursive devam
+            if (remaining.length === 14) {
+                const result = this.findValidCombination(remaining);
+                if (result.valid) {
+                    result.discardIndex = i;
+                    result.discardTile = hand[i];
+                    return result;
+                }
+            }
+        }
+
+        return { valid: false, reason: 'Geçerli bir kombinasyon bulunamadı' };
     }
 
     // Geçerli kombinasyon bul
@@ -200,36 +221,77 @@ class OkeyGame {
 
     // 7 çift kontrolü
     checkSevenPairs(tiles) {
-        const sorted = [...tiles].sort((a, b) => {
+        // Sahte okeyler ve gerçek okeyler ayrı ele alınmalı
+        // Sahte okey: normal taş gibi çift yapabilir (iki sahte okey = 1 çift)
+        // Gerçek okey: herhangi bir taşla çift yapabilir (joker)
+
+        const realOkeys = [];
+        const normalTiles = [];
+
+        for (const t of tiles) {
+            if (t.isFakeOkey) {
+                // Sahte okey, normal taş gibi ele al (ama renk/sayı yok, kendi aralarında çift olurlar)
+                normalTiles.push(t);
+            } else if (this.isOkey(t)) {
+                realOkeys.push(t);
+            } else {
+                normalTiles.push(t);
+            }
+        }
+
+        // Normal taşları sırala
+        const sorted = [...normalTiles].sort((a, b) => {
+            // Sahte okeyler sona
+            if (a.isFakeOkey && !b.isFakeOkey) return 1;
+            if (!a.isFakeOkey && b.isFakeOkey) return -1;
+            if (a.isFakeOkey && b.isFakeOkey) return 0;
             if (a.color !== b.color) return a.color.localeCompare(b.color);
             return a.number - b.number;
         });
 
         let pairs = 0;
-        let okeyCount = tiles.filter(t => this.isOkey(t)).length;
+        let okeyCount = realOkeys.length;
         let i = 0;
 
         while (i < sorted.length) {
-            if (this.isOkey(sorted[i])) {
-                i++;
+            const current = sorted[i];
+
+            // Sahte okey çifti: iki sahte okey = 1 çift
+            if (current.isFakeOkey) {
+                if (i + 1 < sorted.length && sorted[i + 1].isFakeOkey) {
+                    pairs++;
+                    i += 2;
+                } else if (okeyCount > 0) {
+                    pairs++;
+                    okeyCount--;
+                    i++;
+                } else {
+                    return false; // Eşleşemeyen sahte okey
+                }
                 continue;
             }
 
+            // Normal taş çifti: aynı renk + aynı sayı
             if (i + 1 < sorted.length &&
+                !sorted[i + 1].isFakeOkey &&
                 sorted[i].color === sorted[i + 1].color &&
                 sorted[i].number === sorted[i + 1].number) {
                 pairs++;
                 i += 2;
             } else if (okeyCount > 0) {
+                // Okey ile çift yap
                 pairs++;
                 okeyCount--;
                 i++;
             } else {
-                return false;
+                return false; // Eşleşemeyen taş
             }
         }
 
-        return pairs + Math.floor(okeyCount / 2) >= 7;
+        // Kalan okeyler kendi aralarında çift yapabilir
+        pairs += Math.floor(okeyCount / 2);
+
+        return pairs >= 7;
     }
 
     // Per ve seri kontrolü
@@ -239,9 +301,9 @@ class OkeyGame {
     }
 
     tryFormGroups(remaining, groups) {
-        // Okeyleri ayır
-        const okeys = remaining.filter(t => this.isOkey(t));
-        const normalTiles = remaining.filter(t => !this.isOkey(t));
+        // Okeyleri ayır (sadece gerçek okeyler joker olarak kullanılır, sahte okeyler normal taş)
+        const okeys = remaining.filter(t => !t.isFakeOkey && this.isOkey(t));
+        const normalTiles = remaining.filter(t => t.isFakeOkey || !this.isOkey(t));
 
         if (normalTiles.length === 0 && okeys.length === 0) {
             // Tüm gruplar geçerli mi kontrol et
@@ -360,16 +422,180 @@ class OkeyGame {
         return false;
     }
 
-    // Oyunu bitir
-    finishGame(playerId) {
+    // Manuel gruplamayı doğrula (kullanıcının elle ayırdığı gruplar)
+    validateManualGroups(hand, groupedTileIds) {
+        // groupedTileIds = [[id1,id2,id3], [id4,id5,id6], ...]
+        // Her grubu taş objelerine çevir
+        const groups = [];
+        const usedIds = new Set();
+
+        for (const groupIds of groupedTileIds) {
+            if (groupIds.length < 3) {
+                return { valid: false, reason: `Bir grup ${groupIds.length} taş içeriyor (minimum 3)` };
+            }
+
+            const group = [];
+            for (const id of groupIds) {
+                const tile = hand.find(t => t.id === id);
+                if (!tile) {
+                    return { valid: false, reason: 'Geçersiz taş ID' };
+                }
+                if (usedIds.has(id)) {
+                    return { valid: false, reason: 'Aynı taş birden fazla grupta' };
+                }
+                usedIds.add(id);
+                group.push(tile);
+            }
+            groups.push(group);
+        }
+
+        // Toplam kullanılan taş sayısı 14 olmalı
+        if (usedIds.size !== 14) {
+            // 15 taşlı elde 1 taş dışarıda kalabilir
+            if (hand.length === 15 && usedIds.size === 14) {
+                // OK - 1 taş discard olacak
+            } else {
+                return { valid: false, reason: `14 taş gruplandırılmalı (${usedIds.size} taş gruplandırıldı)` };
+            }
+        }
+
+        // Her grubu doğrula
+        for (let i = 0; i < groups.length; i++) {
+            if (!this.isValidGroup(groups[i])) {
+                return { valid: false, reason: `Grup ${i + 1} geçerli değil` };
+            }
+        }
+
+        // Kullanılmayan taş (15 taşlı elde discard olacak)
+        let discardTile = null;
+        if (hand.length === 15) {
+            discardTile = hand.find(t => !usedIds.has(t.id));
+        }
+
+        return {
+            valid: true,
+            type: 'manual_groups',
+            discardTile: discardTile
+        };
+    }
+
+    // Tek bir grubun geçerli olup olmadığını kontrol et
+    isValidGroup(group) {
+        if (group.length < 3) return false;
+
+        // Okeyleri ve normal taşları ayır
+        const okeys = group.filter(t => (this.isOkey(t) && !t.isFakeOkey));
+        const normals = group.filter(t => !(this.isOkey(t) && !t.isFakeOkey));
+
+        // SET kontrolü: aynı sayı, farklı renkler
+        if (this.isValidSet(normals, okeys.length)) return true;
+
+        // RUN kontrolü: aynı renk, ardışık sayılar
+        if (this.isValidRun(normals, okeys.length)) return true;
+
+        return false;
+    }
+
+    // Set kontrolü: aynı sayı, farklı renkler (+ okey)
+    isValidSet(normals, okeyCount) {
+        if (normals.length === 0 && okeyCount >= 3) return true;
+        if (normals.length === 0) return false;
+
+        // Tüm normal taşlar aynı sayıda olmalı
+        const number = normals[0].number;
+        if (!normals.every(t => t.number === number)) return false;
+
+        // Renkler farklı olmalı
+        const colors = normals.map(t => t.color);
+        const uniqueColors = new Set(colors);
+        if (uniqueColors.size !== normals.length) return false;
+
+        // Toplam (normal + okey) 3-4 arası olmalı
+        const total = normals.length + okeyCount;
+        if (total < 3 || total > 4) return false;
+
+        return true;
+    }
+
+    // Run kontrolü: aynı renk, ardışık sayılar (+ okey)
+    isValidRun(normals, okeyCount) {
+        if (normals.length === 0 && okeyCount >= 3) return true;
+        if (normals.length === 0) return false;
+
+        // Tüm normal taşlar aynı renkte olmalı
+        const color = normals[0].color;
+        if (!normals.every(t => t.color === color)) return false;
+
+        // Sayılara göre sırala
+        const sorted = normals.sort((a, b) => a.number - b.number);
+
+        // Boşlukları say
+        let neededOkeys = 0;
+        for (let i = 1; i < sorted.length; i++) {
+            const gap = sorted[i].number - sorted[i - 1].number;
+            if (gap === 0) return false; // Aynı sayı aynı renkte tekrar
+            if (gap === 1) continue; // Ardışık, OK
+            neededOkeys += (gap - 1); // Boşluklar için okey gerekli
+        }
+
+        if (neededOkeys > okeyCount) return false;
+
+        // Toplam uzunluk 3+ olmalı
+        const totalLength = sorted.length + okeyCount;
+        if (totalLength < 3) return false;
+
+        // Sayı aralığı 1-13 arası olmalı
+        const minNum = sorted[0].number;
+        const maxNum = sorted[sorted.length - 1].number;
+
+        // Okeylerin başa/sona eklenmesi hesabı
+        const remainingOkeys = okeyCount - neededOkeys;
+        const effectiveMin = Math.max(1, minNum - remainingOkeys);
+        const effectiveMax = Math.min(13, maxNum + remainingOkeys);
+
+        if (effectiveMin < 1 || effectiveMax > 13) return false;
+
+        return true;
+    }
+
+    // Oyunu bitir (groups: opsiyonel manuel gruplama [[id1,id2,id3], ...])
+    finishGame(playerId, groups = null) {
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex === -1) return null;
 
         const hand = this.players[playerIndex].hand;
-        const result = this.checkHand(hand);
+        let result;
+
+        // Manuel gruplama varsa önce onu dene
+        if (groups && groups.length > 0) {
+            result = this.validateManualGroups(hand, groups);
+        }
+
+        // Manuel gruplama yoksa veya geçersizse, otomatik kontrol
+        if (!result || !result.valid) {
+            const autoResult = this.checkHand(hand);
+            if (autoResult.valid) {
+                result = autoResult;
+            } else if (!result) {
+                result = autoResult;
+            }
+            // Manuel geçersiz ama otomatik de geçersizse, manuel hata mesajını göster
+        }
 
         if (!result.valid) {
             return { success: false, reason: result.reason };
+        }
+
+        // 15 taşla bitiriyorsa, fazla taşı at
+        let discardedTile = null;
+        if (result.discardTile) {
+            discardedTile = result.discardTile;
+            // Elden çıkar
+            const idx = hand.findIndex(t => t.id === discardedTile.id);
+            if (idx !== -1) {
+                hand.splice(idx, 1);
+                this.discardPile.push(discardedTile);
+            }
         }
 
         // Skor hesapla
@@ -392,7 +618,8 @@ class OkeyGame {
             score,
             type: result.type,
             hand: winnerHand,
-            allHands: allHands
+            allHands: allHands,
+            discardedTile: discardedTile
         };
 
         this.gameStarted = false;
@@ -511,7 +738,8 @@ class OkeyGame {
                 id: p.id,
                 name: p.name,
                 tileCount: p.hand.length,
-                isReady: p.isReady
+                isReady: p.isReady,
+                isBot: p.isBot || false
             })),
             currentPlayerIndex: this.currentPlayerIndex,
             currentPlayerId: this.players[this.currentPlayerIndex]?.id,

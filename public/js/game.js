@@ -73,7 +73,9 @@ class OkeyGameClient {
 
         // Oyuncu ayrıldı
         this.socket.on('player-left', (data) => {
-            this.gameState = data.game;
+            if (this.gameState && data.game) {
+                this.gameState = data.game;
+            }
             this.updateWaitingRoom();
             this.showToast(`${data.playerName} odadan ayrıldı`, 'warning');
         });
@@ -122,16 +124,6 @@ class OkeyGameClient {
             this.showResultModal(data.winner);
         });
 
-        // Oyuncu ayrıldı
-        this.socket.on('player-left', (data) => {
-            this.showToast(`${data.playerName} oyundan ayrıldı`, 'warning');
-
-            // Eğer oyun devam ediyorsa güncelle
-            if (this.gameState && data.game) {
-                this.gameState = data.game;
-                this.updateWaitingRoom();
-            }
-        });
 
         // Taşlar bitti - berabere
         this.socket.on('game-ended-draw', (data) => {
@@ -182,6 +174,10 @@ class OkeyGameClient {
 
         document.getElementById('start-game-btn').addEventListener('click', () => {
             this.startGame();
+        });
+
+        document.getElementById('add-bot-btn').addEventListener('click', () => {
+            this.addBot();
         });
 
         document.getElementById('leave-room-btn').addEventListener('click', () => {
@@ -296,6 +292,17 @@ class OkeyGameClient {
         });
     }
 
+    // Bot ekle
+    addBot() {
+        this.socket.emit('add-bot', (response) => {
+            if (response.success) {
+                this.showToast(`${response.botPlayer.name} eklendi!`, 'success');
+            } else {
+                this.showToast(response.error || 'Bot eklenemedi', 'error');
+            }
+        });
+    }
+
     // Oyunu başlat
     startGame() {
         this.socket.emit('start-game', (response) => {
@@ -377,16 +384,14 @@ class OkeyGameClient {
             return;
         }
 
-        if (this.gameState.myHand.length !== 14) {
-            this.showToast('Elinizde 14 taş olmalı', 'warning');
-            return;
-        }
+        // Grupları al (kullanıcı elle gruplamışsa)
+        const groups = this.getGroupedHand();
 
-        this.socket.emit('finish-game', (response) => {
+        this.socket.emit('finish-game', { groups: groups }, (response) => {
             if (response.success) {
                 this.showResultModal(response.winner);
             } else {
-                this.showToast(response.error || 'Eliniz geçerli değil', 'error');
+                this.showToast(response.error || response.reason || 'Eliniz geçerli değil', 'error');
             }
         });
     }
@@ -445,14 +450,19 @@ class OkeyGameClient {
                 const player = this.gameState.players[i];
                 const isHost = i === 0;
                 const isMe = player.id === this.socket.id;
+                const isBot = player.isBot || player.id?.startsWith('bot_');
 
                 slot.classList.add('filled');
                 if (isHost) slot.classList.add('host');
+                if (isBot) slot.classList.add('bot');
+
+                const avatar = isBot ? '🤖' : (isMe ? '👤' : '🎮');
+                const label = isBot ? ' (Bot)' : (isMe ? ' (Sen)' : '');
 
                 slot.innerHTML = `
-                    <div class="avatar">${isMe ? '👤' : '🎮'}</div>
-                    <div class="name">${player.name}${isMe ? ' (Sen)' : ''}</div>
-                    <div class="status">Hazır</div>
+                    <div class="avatar">${avatar}</div>
+                    <div class="name">${player.name}${label}</div>
+                    <div class="status">${isBot ? 'Bot' : 'Hazır'}</div>
                 `;
             } else {
                 slot.classList.add('empty');
@@ -474,6 +484,12 @@ class OkeyGameClient {
         // Sadece host ve 4 oyuncu varsa etkinleştir
         const isHost = this.gameState.players[0]?.id === this.socket.id;
         startBtn.disabled = !isHost || playerCount !== 4;
+
+        // Bot ekle butonu: sadece host görsün, oda doluysa gizle
+        const addBotBtn = document.getElementById('add-bot-btn');
+        if (addBotBtn) {
+            addBotBtn.style.display = (isHost && playerCount < 4) ? '' : 'none';
+        }
     }
 
     // Oyun arayüzünü güncelle
@@ -524,9 +540,9 @@ class OkeyGameClient {
         // Oyuncunun eli
         this.renderPlayerHand();
 
-        // Eli Aç butonu
+        // Eli Aç butonu - sıra oyuncudaysa her zaman aktif
         const openHandBtn = document.getElementById('open-hand-btn');
-        openHandBtn.disabled = !this.isMyTurn || this.gameState.myHand?.length !== 14;
+        openHandBtn.disabled = !this.isMyTurn;
     }
 
     // Rakipleri render et
@@ -767,8 +783,8 @@ class OkeyGameClient {
 
     // Eli açmak için gruplandırma ekranını göster
     openHandForGrouping() {
-        if (!this.isMyTurn || this.gameState.myHand?.length !== 14) {
-            this.showToast('Elinizde 14 taş olmalı', 'warning');
+        if (!this.isMyTurn) {
+            this.showToast('Sıranız değil', 'warning');
             return;
         }
 

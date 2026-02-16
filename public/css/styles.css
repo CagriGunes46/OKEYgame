@@ -888,63 +888,7 @@ body {
     -webkit-user-select: none;
 }
 
-/* ========================================
-   Mobil Uyumluluk
-   ======================================== */
-@media (max-width: 768px) {
-    .player-hand {
-        gap: 2px;
-        padding: var(--space-sm);
-        min-height: 70px;
-    }
-
-    .player-hand .tile {
-        width: 36px;
-        height: 50px;
-        font-size: 0.85rem;
-    }
-
-    .hand-actions {
-        gap: var(--space-sm);
-    }
-
-    .btn-sort {
-        padding: 4px 8px;
-        font-size: 0.7rem;
-    }
-
-    #open-hand-btn {
-        padding: var(--space-xs) var(--space-sm);
-        font-size: 0.75rem;
-    }
-
-    .game-container {
-        grid-template-rows: 60px 1fr 1fr auto;
-    }
-
-    .opponent-section .tile {
-        width: 16px;
-        height: 22px;
-    }
-}
-
-@media (max-width: 480px) {
-    .player-hand .tile {
-        width: 30px;
-        height: 42px;
-        font-size: 0.75rem;
-        border-radius: 4px;
-    }
-
-    .sort-buttons {
-        gap: 2px;
-    }
-
-    .btn-sort {
-        padding: 3px 6px;
-        font-size: 0.65rem;
-    }
-}
+/* Mobil uyumluluk -> alttaki Responsive Design bölümüne taşındı */
 
 .btn-sm {
     padding: var(--space-sm) var(--space-md);
@@ -1240,7 +1184,7 @@ body {
 @media (max-width: 1024px) {
     .game-container {
         grid-template-columns: 120px 1fr 120px;
-        grid-template-rows: 100px 1fr 160px;
+        grid-template-rows: 80px 1fr auto;
     }
 
     .tile {
@@ -1255,7 +1199,139 @@ body {
     }
 }
 
-@media (max-width: 768px) {
+/* === MOBİL: Yatay (Landscape) === */
+@media (max-width: 768px) and (orientation: landscape) {
+    .game-container {
+        grid-template-areas:
+            "left table right"
+            "hand hand hand";
+        grid-template-columns: 100px 1fr 100px;
+        grid-template-rows: 1fr auto;
+        gap: 4px;
+        padding: 4px;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+    }
+
+    .opponent-top {
+        display: none;
+    }
+
+    .opponent {
+        padding: 4px;
+        gap: 2px;
+    }
+
+    .player-info {
+        padding: 2px 6px;
+    }
+
+    .player-info .player-name {
+        font-size: 0.7rem;
+    }
+
+    .player-info .tile-count {
+        font-size: 0.6rem;
+    }
+
+    .opponent-tile {
+        width: 12px;
+        height: 18px;
+        border-radius: 2px;
+    }
+
+    .game-table {
+        padding: 4px;
+    }
+
+    .table-center {
+        gap: var(--space-sm);
+    }
+
+    .indicator-section .label {
+        font-size: 0.6rem;
+    }
+
+    .pile {
+        width: 45px;
+        height: 60px;
+    }
+
+    .pile-count {
+        font-size: 1rem;
+    }
+
+    .turn-indicator {
+        padding: 2px 8px;
+        font-size: 0.7rem;
+        bottom: 4px;
+    }
+
+    .player-hand-section {
+        padding: 2px 4px;
+        gap: 4px;
+    }
+
+    .player-hand {
+        gap: 2px;
+        padding: 4px 8px;
+        min-height: 48px;
+        max-width: 100%;
+    }
+
+    .player-hand .tile {
+        width: 30px;
+        height: 42px;
+        font-size: 0.8rem;
+        border-radius: 4px;
+    }
+
+    .player-hand .tile .tile-color-dot {
+        width: 5px;
+        height: 5px;
+    }
+
+    .player-hand .tile:hover {
+        transform: translateY(-4px);
+    }
+
+    .hand-actions {
+        gap: 4px;
+    }
+
+    #open-hand-btn {
+        padding: 3px 8px;
+        font-size: 0.65rem;
+    }
+
+    .btn-sort {
+        padding: 3px 6px;
+        font-size: 0.6rem;
+    }
+
+    .sort-buttons {
+        gap: 2px;
+    }
+
+    .game-header {
+        bottom: 4px;
+        left: 4px;
+    }
+
+    .room-badge {
+        font-size: 0.6rem;
+        padding: 2px 4px;
+    }
+
+    #exit-game-btn {
+        padding: 2px 6px;
+        font-size: 0.6rem;
+    }
+}
+
+/* === MOBİL: Dikey (Portrait) === */
+@media (max-width: 768px) and (orientation: portrait) {
     .game-container {
         grid-template-areas:
             "top top"
@@ -1263,30 +1339,127 @@ body {
             "table table"
             "hand hand";
         grid-template-columns: 1fr 1fr;
-        grid-template-rows: 80px 80px 1fr 180px;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 4px;
+        padding: 4px;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
     }
 
-    .opponent-left,
-    .opponent-right {
+    .opponent {
         flex-direction: row;
+        padding: 4px;
+        gap: 4px;
+    }
+
+    .player-info {
+        padding: 2px 6px;
+    }
+
+    .player-info .player-name {
+        font-size: 0.75rem;
+    }
+
+    .player-info .tile-count {
+        font-size: 0.65rem;
+    }
+
+    .opponent-tile {
+        width: 14px;
+        height: 20px;
+        border-radius: 2px;
+    }
+
+    .game-table {
+        padding: 8px;
     }
 
     .table-center {
-        gap: var(--space-lg);
+        gap: var(--space-md);
     }
 
     .pile {
-        width: 50px;
-        height: 70px;
+        width: 45px;
+        height: 60px;
     }
 
-    .tile {
-        width: 34px;
-        height: 46px;
+    .pile-count {
         font-size: 1rem;
+    }
+
+    .indicator-section .label {
+        font-size: 0.65rem;
+    }
+
+    .turn-indicator {
+        padding: 3px 10px;
+        font-size: 0.75rem;
+        bottom: 4px;
+    }
+
+    .player-hand-section {
+        padding: 4px;
+        gap: 4px;
+    }
+
+    .player-hand {
+        gap: 2px;
+        padding: 6px;
+        min-height: 50px;
+    }
+
+    .player-hand .tile {
+        width: 32px;
+        height: 44px;
+        font-size: 0.85rem;
+        border-radius: 4px;
+    }
+
+    .player-hand .tile .tile-color-dot {
+        width: 6px;
+        height: 6px;
+    }
+
+    .player-hand .tile:hover {
+        transform: translateY(-4px);
+    }
+
+    .hand-actions {
+        gap: 4px;
+    }
+
+    #open-hand-btn {
+        padding: 3px 8px;
+        font-size: 0.7rem;
+    }
+
+    .btn-sort {
+        padding: 3px 8px;
+        font-size: 0.65rem;
+    }
+
+    .sort-buttons {
+        gap: 3px;
+    }
+
+    .game-header {
+        bottom: 4px;
+        left: 4px;
+    }
+
+    .room-badge {
+        font-size: 0.6rem;
+        padding: 2px 4px;
+    }
+
+    #exit-game-btn {
+        padding: 2px 6px;
+        font-size: 0.6rem;
     }
 }
 
+/* === 480px altı (küçük telefonlar) === */
 @media (max-width: 480px) {
 
     .lobby-container,
@@ -1306,9 +1479,34 @@ body {
         flex-direction: column;
     }
 
-    .tile {
-        width: 30px;
-        height: 42px;
-        font-size: 0.9rem;
+    .player-hand .tile {
+        width: 26px;
+        height: 38px;
+        font-size: 0.7rem;
+        border-radius: 3px;
+    }
+
+    .player-hand .tile .tile-color-dot {
+        width: 4px;
+        height: 4px;
+    }
+
+    .btn-sort {
+        padding: 2px 5px;
+        font-size: 0.6rem;
+    }
+
+    #open-hand-btn {
+        padding: 2px 6px;
+        font-size: 0.6rem;
+    }
+
+    .pile {
+        width: 38px;
+        height: 52px;
+    }
+
+    .pile-count {
+        font-size: 0.85rem;
     }
 }

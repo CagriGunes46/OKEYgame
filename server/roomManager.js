@@ -74,6 +74,35 @@ class RoomManager {
         return { success: true, roomDeleted: false };
     }
 
+    // Odaya bot ekle
+    addBot(roomId) {
+        const room = this.rooms.get(roomId);
+        if (!room) {
+            return { success: false, error: 'Room not found' };
+        }
+
+        if (room.game.gameStarted) {
+            return { success: false, error: 'Game already started' };
+        }
+
+        if (room.game.players.length >= 4) {
+            return { success: false, error: 'Room is full' };
+        }
+
+        const { BotPlayer } = require('./botPlayer');
+        const botId = BotPlayer.generateBotId();
+        const botName = BotPlayer.getBotName();
+
+        const botPlayer = { id: botId, name: botName, isBot: true };
+        const added = room.game.addPlayer(botPlayer);
+
+        if (!added) {
+            return { success: false, error: 'Could not add bot' };
+        }
+
+        return { success: true, botPlayer };
+    }
+
     // Odayı al
     getRoom(roomId) {
         return this.rooms.get(roomId);
